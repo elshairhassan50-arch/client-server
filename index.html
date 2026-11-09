@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>درس 2-3: طرق اتصال تطبيقات الويب (العميل والخادم والـ API)</title>
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(56, 189, 248, 0.25);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.5);
+      --accent: #818cf8;
+      --accent-glow: rgba(129, 140, 248, 0.5);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.5);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+    }
+
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    
+    body {
+      background: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.12) 0px, transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(129, 140, 248, 0.12) 0px, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 60%);
+      color: var(--text-main);
+      margin: 0;
+      padding: 30px 20px;
+      direction: rtl;
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 35px;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+      margin-bottom: 10px;
+      letter-spacing: -0.5px;
+    }
+
+    header p { 
+      color: var(--text-sub); 
+      margin: 0; 
+      font-size: 1.05rem; 
+      font-weight: 500;
+    }
+
+    /* محاكي الأنيميشن الرئيسي */
+    .simulator-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 24px;
+      padding: 40px 25px;
+      margin-bottom: 35px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .nodes-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      padding: 20px 10px;
+      min-height: 220px;
+    }
+
+    .wire-track {
+      position: absolute;
+      top: 50%;
+      left: 70px;
+      right: 70px;
+      height: 6px;
+      background: #0f172a;
+      transform: translateY(-50%);
+      z-index: 1;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .node {
+      position: relative;
+      z-index: 2;
+      width: 160px;
+      padding: 18px 10px;
+      text-align: center;
+      background: rgba(11, 15, 25, 0.9);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .node:hover { 
+      transform: translateY(-5px); 
+    }
+
+    .node.client { 
+      border-color: var(--primary); 
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.25); 
+    }
+    .node.api { 
+      border-color: var(--accent); 
+      box-shadow: 0 0 25px rgba(129, 140, 248, 0.25); 
+      min-width: 190px;
+    }
+    .node.server { 
+      border-color: var(--success); 
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.25); 
+    }
+
+    .node-icon { 
+      font-size: 2.2rem; 
+      margin-bottom: 6px; 
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+    }
+    
+    .node-title { 
+      font-weight: 700; 
+      font-size: 1rem; 
+      color: #fff; 
+    }
+    
+    .node-sub { 
+      font-size: 0.78rem; 
+      color: var(--text-sub); 
+      margin-top: 4px; 
+    }
+
+    /* التوضيح الداخلي لكارت الـ API */
+    .api-endpoint-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 8px;
+      background: rgba(129, 140, 248, 0.15);
+      border: 1px solid rgba(129, 140, 248, 0.4);
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      direction: ltr;
+    }
+
+    /* طرد البيانات المتحرك */
+    .packet {
+      position: absolute;
+      top: 50%;
+      left: 70px;
+      transform: translate(-50%, -50%);
+      padding: 10px 20px;
+      border-radius: 40px;
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: #fff;
+      background: var(--primary);
+      box-shadow: 0 0 20px var(--primary-glow);
+      z-index: 3;
+      opacity: 0;
+      white-space: nowrap;
+      pointer-events: none;
+      letter-spacing: 0.5px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* لوحة التفاعل والتحكم */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 22px;
+      margin-bottom: 35px;
+    }
+
+    .control-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .control-box h3 {
+      margin: 0 0 15px 0;
+      color: var(--primary);
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label { 
+      display: block; 
+      margin-top: 12px; 
+      font-size: 0.9rem; 
+      color: var(--text-sub); 
+      font-weight: 600;
+    }
+
+    select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      background: rgba(3, 7, 18, 0.8);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      border-radius: 12px;
+      outline: none;
+      font-size: 0.92rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+    }
+
+    .proto-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .proto-btn {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      background: rgba(3, 7, 18, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-sub);
+      transition: all 0.2s;
+    }
+
+    .proto-btn.active {
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+    }
+
+    .send-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      background: linear-gradient(135deg, #0284c7 0%, #6366f1 100%);
+      border: none;
+      border-radius: 14px;
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.05rem;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .send-btn:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(56, 189, 248, 0.5);
+    }
+    .send-btn:active { transform: translateY(0); }
+
+    pre {
+      background: #020617;
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      padding: 16px;
+      border-radius: 12px;
+      color: #38bdf8;
+      direction: ltr;
+      text-align: left;
+      font-family: 'Fira Code', monospace, Consolas;
+      font-size: 0.88rem;
+      overflow-x: auto;
+      margin-top: 12px;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    /* قسم تشريح الـ API والتوجيه (Endpoints Structure) */
+    .api-structure-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 30px;
+      margin-top: 35px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .routes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .route-item {
+      background: rgba(11, 15, 25, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .route-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      direction: ltr;
+    }
+
+    .method-tag {
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: #fff;
+    }
+    .method-get { background: var(--primary); }
+    .method-post { background: var(--success); }
+
+    .route-path {
+      font-family: monospace;
+      font-size: 0.9rem;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .route-desc {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+    }
+
+    /* كروت المنهج */
+    .section-title {
+      color: var(--primary);
+      font-size: 1.4rem;
+      font-weight: 800;
+      border-right: 5px solid var(--primary);
+      padding-right: 15px;
+      margin: 45px 0 25px 0;
+      text-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+    }
+
+    .vocab-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 20px;
+    }
+
+    .vocab-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 22px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .vocab-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .vocab-card h4 {
+      margin: 0 0 10px 0;
+      color: #fff;
+      font-size: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .vocab-card p {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--text-sub);
+      line-height: 1.7;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    /* جدول المقارنة بين HTTP و API */
+    .compare-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 30px;
+      margin-top: 35px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      text-align: right;
+    }
+
+    .compare-table th, .compare-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.95rem;
+    }
+
+    .compare-table th {
+      color: var(--primary);
+      font-size: 1.05rem;
+      background: rgba(3, 7, 18, 0.5);
+    }
+
+    .compare-table tr:hover {
+      background: rgba(56, 189, 248, 0.03);
+    }
+
+    .think-box {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 20px;
+      padding: 25px;
+      margin-top: 30px;
+      backdrop-filter: blur(10px);
+    }
+
+    .think-box h4 { 
+      margin: 0 0 10px 0; 
+      color: var(--warning); 
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .think-box p { 
+      margin: 0; 
+      font-size: 0.95rem; 
+      line-height: 1.7; 
+      color: #e2e8f0;
+    }
+
+    /* قسم محاكاة التفاعل المباشر (إعجاب بمنشور - LIKE) */
+    .like-demo-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 30px;
+      margin-top: 45px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .like-demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 25px;
+      margin-top: 20px;
+    }
+
+    .post-card {
+      background: rgba(11, 15, 25, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .post-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .post-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .post-author { font-weight: bold; font-size: 0.98rem; }
+    .post-time { font-size: 0.75rem; color: var(--text-sub); }
+
+    .post-content {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      margin-bottom: 20px;
+    }
+
+    .like-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .like-btn:hover { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
+    .like-btn.liked { background: rgba(239, 68, 68, 0.25); border-color: var(--danger); color: #f87171; }
+
+    .url-badge {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--primary);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>محاكاة الاتصال بين العميل والخادم و API</h1>
+    <p>درس تفاعلي لشرح انتقال الطلبات والاستجابات وصيغة JSON للطلاب</p>
+  </header>
+
+  <!-- محاكي حركة البيانات الرئيسي -->
+  <div class="simulator-card">
+    <div class="nodes-container" id="nodesContainer">
+      <div class="wire-track"></div>
+
+      <div class="node client" id="nodeClient">
+        <div class="node-icon">💻</div>
+        <div class="node-title">العميل (Client)</div>
+        <div class="node-sub">المتصفح / الهاتف</div>
+      </div>
+
+      <!-- محطة الـ API وبداخلها المسار المحدد -->
+      <div class="node api" id="nodeApi">
+        <div class="node-icon">🔌</div>
+        <div class="node-title">الـ API</div>
+        <div class="node-sub">العقد والمسارات</div>
+        <div class="api-endpoint-badge" id="activeEndpointBadge">Route: /api/products</div>
+      </div>
+
+      <div class="node server" id="nodeServer">
+        <div class="node-icon">🖥️</div>
+        <div class="node-title">الخادم (Server)</div>
+        <div class="node-sub">المعالجة والبيانات</div>
+      </div>
+
+      <div class="packet" id="packet">HTTP GET</div>
+    </div>
+  </div>
+
+  <!-- لوحة التحكم -->
+  <div class="controls-grid">
+    
+    <div class="control-box">
+      <div>
+        <h3>⚡ 1. إرسال الطلب (Request)</h3>
+        <label>طريقة الطلب (HTTP Method):</label>
+        <select id="methodSelect" onchange="updateEndpointDisplay()">
+          <option value="GET">GET — طلب بيانات (عرض صفحة / بحث)</option>
+          <option value="POST">POST — إرسال بيانات (تسجيل دخول / نموذج)</option>
+        </select>
+
+        <label>البروتوكول المستخدم:</label>
+        <div class="proto-group">
+          <div class="proto-btn active" id="btnHttp" onclick="setProto('HTTP')">HTTP</div>
+          <div class="proto-btn" id="btnHttps" onclick="setProto('HTTPS')">HTTPS 🔒</div>
+        </div>
+      </div>
+
+      <button class="send-btn" onclick="startSimulation()">🚀 إرسال الطلب الآن</button>
+    </div>
+
+    <div class="control-box">
+      <div>
+        <h3>📡 2. نتيجة الاستجابة من الخادم</h3>
+        <label>رمز حالة الـ HTTP المتوقع:</label>
+        <select id="statusSelect" onchange="updateJsonResponse()">
+          <option value="200">200 OK — تمت العملية بنجاح</option>
+          <option value="404">404 Not Found — المورد غير موجود</option>
+          <option value="500">500 Server Error — خطأ داخلي في الخادم</option>
+        </select>
+      </div>
+
+      <div style="margin-top: 20px; font-size: 0.95rem;" id="statusText">
+        حالة الاستجابة: <span style="color:var(--success); font-weight:bold;">200 OK</span>
+      </div>
+    </div>
+
+    <div class="control-box">
+      <h3>📄 3. البيانات المستلمة (JSON)</h3>
+      <pre id="jsonDisplay">{
+  "status": 200,
+  "message": "تمت العملية بنجاح",
+  "data": { "course": "3-2", "active": true }
+}</pre>
+    </div>
+
+  </div>
+
+  <!-- 🎯 تشريح كارت الـ API والمسارات (API Endpoints & Routes) -->
+  <div class="api-structure-card">
+    <h3 style="margin-top:0; color:var(--accent); font-size:1.25rem;">🧩 تشريح الـ API: كيف يحدد الواجهة الخلفية (Backend) المسارات؟</h3>
+    <p style="color:var(--text-sub); font-size:0.95rem; line-height:1.6;">
+      لكل موقع أو تطبيق <strong>API خاص به</strong> يصممه مبرمج الواجهة الخلفية (Backend). يتكون الـ API من نقط انتهاء يطلق عليها <strong>Endpoints (أو Routes)</strong>، وتكون كل نقطة مخصصة لوظيفة معينة:
+    </p>
+
+    <div class="routes-grid">
+      <div class="route-item">
+        <div class="route-header">
+          <span class="method-tag method-post">POST</span>
+          <span class="route-path">/api/login</span>
+        </div>
+        <div class="route-desc">مخصص لتسجيل الدخول: يرسل العميل الاسم وكلمة المرور في الـ Payload ليتحقق منها الخادم.</div>
+      </div>
+
+      <div class="route-item">
+        <div class="route-header">
+          <span class="method-tag method-get">GET</span>
+          <span class="route-path">/api/products</span>
+        </div>
+        <div class="route-desc">مخصص لعرض المنتجات: يطلب العميل قائمة المنتجات والأسعار ليعرضها للمستخدم.</div>
+      </div>
+
+      <div class="route-item">
+        <div class="route-header">
+          <span class="method-tag method-post">POST</span>
+          <span class="route-path">/api/posts/101/like</span>
+        </div>
+        <div class="route-desc">مخصص لتفاعل الإعجاب: يبعث العميل رقم المستخدم ورقم البوست لتحديث عدد اللايكات.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- تطبيق عملي للطلاب: اللايك -->
+  <h2 class="section-title">🧪 تطبيق عملي للطلاب: ماذا يحدث في الكواليس عند الضغط على "لايك"؟</h2>
+
+  <div class="like-demo-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+      <div>
+        <label style="margin:0;">اختر الطالب الذي يجلس أمام الشاشة الآن:</label>
+        <select id="userSelect" style="width:auto; min-width:200px; display:inline-block; margin-top:5px;" onchange="resetLikeState()">
+          <option value="عمر">الطالب: عمر (Omar)</option>
+          <option value="عبد الله">الطالب: عبد الله (Abdullah)</option>
+        </select>
+      </div>
+      <div style="color: var(--text-sub); font-size:0.9rem;">
+        سيرسل متصفح <strong id="activeStudentName" style="color:var(--primary);">عمر</strong> طلباً إلى الخادم عبر الـ API بمجرد الضغط!
+      </div>
+    </div>
+
+    <div class="like-demo-grid">
+      <!-- 1. واجهة العميل -->
+      <div class="post-card">
+        <div>
+          <div class="post-header">
+            <div class="post-avatar">VA</div>
+            <div>
+              <div class="post-author">Vision Academy</div>
+              <div class="post-time">منذ 5 دقائق • 🌐</div>
+            </div>
+          </div>
+          <div class="post-content">
+            أهلاً بكم في درس طرق اتصال تطبيقات الويب! كيف تنتقل الطلبات بين العميل والخادم؟ 🤔
+          </div>
+        </div>
+
+        <button class="like-btn" id="likeBtn" onclick="sendLikeRequest()">
+          <span id="heartIcon">🤍</span> <span id="likeText">إعجاب (Like)</span> • <span id="likesCount">12</span>
+        </button>
+      </div>
+
+      <!-- 2. تفاصيل الطلب -->
+      <div class="post-card">
+        <h4 style="margin-top:0; color:var(--primary);">📤 الطلب الصادر من العميل (HTTP Request)</h4>
+        <div class="url-badge">POST https://api.vision.com/posts/101/like</div>
+        <label style="margin-top:0;">طريقة الطلب: <span style="color:var(--accent); font-weight:bold;">POST</span></label>
+        <label>حمولة البيانات المبعوثة (JSON Payload):</label>
+        <pre id="requestPayload">{
+  "userId": "user_omar",
+  "userName": "عمر",
+  "postId": 101,
+  "action": "LIKE"
+}</pre>
+      </div>
+
+      <!-- 3. تفاصيل الاستجابة -->
+      <div class="post-card">
+        <h4 style="margin-top:0; color:var(--success);">📥 استجابة الخادم (HTTP Response)</h4>
+        <div style="font-size:0.9rem; margin-bottom:10px;">
+          رمز الحالة: <span id="likeStatusCode" style="color:var(--success); font-weight:bold; background:rgba(16,185,129,0.1); padding:2px 8px; border-radius:6px;">200 OK</span>
+        </div>
+        <label style="margin-top:0;">البيانات المعادة من الـ API (JSON Response):</label>
+        <pre id="likeResponsePayload">{
+  "status": "success",
+  "message": "تم تسجيل الإعجاب بنجاح",
+  "updatedLikes": 13
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- مفاهيم المنهج -->
+  <h2 class="section-title">📚 مصطلحات الدرس المعتمدة من الكتاب</h2>
+
+  <div class="vocab-grid">
+    <div class="vocab-card">
+      <h4>العميل (Client) <span class="badge">الجانب الطالب</span></h4>
+      <p>برنامج أو جهاز يرسل طلبًا إلى خدمة أخرى؛ ومن أمثلته متصفح الويب وتطبيق الهاتف.</p>
+    </div>
+
+    <div class="vocab-card">
+      <h4>الخادم (Server) <span class="badge">الجانب المعالج</span></h4>
+      <p>الجانب الذي يستقبل الطلبات من العملاء، ويعالجها، ويعيد الاستجابات والبيانات المطلوبة.</p>
+    </div>
+
+    <div class="vocab-card">
+      <h4>بروتوكول HTTP <span class="badge">النص التشعبي</span></h4>
+      <p>بروتوكول يُستخدم لتبادل الرسائل والطلبات والاستجابات بين العميل والخادم على الويب.</p>
+    </div>
+
+    <div class="vocab-card">
+      <h4>بروتوكول HTTPS <span class="badge">الاتصال الآمن</span></h4>
+      <p>استخدام HTTP عبر اتصال آمن يسمى TLS. يحمي سرية الاتصال وسالمته ومصادقة الخادم لمنع التجسس.</p>
+    </div>
+
+    <div class="vocab-card">
+      <h4>الـ API <span class="badge">واجهة البرمجيات</span></h4>
+      <p>واجهة أو عقد محدد بـ مجموعة قواعد واضحة تسمح لبرنامج بطلب بيانات أو وظائف من برنامج آخر.</p>
+    </div>
+
+    <div class="vocab-card">
+      <h4>صيغة JSON <span class="badge">تبادل البيانات</span></h4>
+      <p>صيغة نصية شائعة لتمثيل وتبادل البيانات المهيكلة باستخدام كائنات ومصفوفات وقيم بسيطة.</p>
+    </div>
+  </div>
+
+  <!-- ⚖️ بطاقة المقارنة بين HTTP و API -->
+  <div class="compare-card">
+    <h3 style="margin-top:0; color:var(--primary); font-size:1.2rem;">⚖️ مقارنة توضيحية للطلاب: ما الفرق بين الـ HTTP والـ API؟</h3>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>وجه المقارنة</th>
+          <th>بروتوكول الـ HTTP</th>
+          <th>واجهة الـ API</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>المفهوم</strong></td>
+          <td>بروتوكول وطريقة نقل الرسائل عبر الشبكة.</td>
+          <td>مجموعة قواعد وعقد يحدد كيف تطلب البيانات وتستقبلها.</td>
+        </tr>
+        <tr>
+          <td><strong>التشبيه الواقعي</strong></td>
+          <td>**وسيلة النقل** (مثل الشاحنة أو الطريق الذي ينقل الطرد).</td>
+          <td>**الجرسون / العقد** (الذي يحدد ماذا يمكنك أن تطلب وكيف يأتيك الطلب).</td>
+        </tr>
+        <tr>
+          <td><strong>الوظيفة</strong></td>
+          <td>يضمن وصول الرسالة من العميل إلى الخادم والعكس بسلام.</td>
+          <td>يحدد شكل الرسالة، الموارد المتاحة، والعمليات (GET, POST).</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="think-box">
+    <h4>💡 توقّف وفكّر: لماذا يجب أن تستخدم صفحة تسجيل الدخول HTTPS بدلاً من HTTP؟</h4>
+    <p>لأن صفحة تسجيل الدخول تحتوي بيانات حساسة (مثل كلمة المرور). باستخدام <strong>HTTPS</strong> المدعوم بتشفير <strong>TLS</strong>، يتم تشفير البيانات قبل نقلها فلا يستطيع أي متجسس على الشبكة قراءتها أو تعديلها أثناء النقل.</p>
+  </div>
+
+  <script>
+    let currentProto = 'HTTP';
+    let animationTimer = null;
+    let isLiked = false;
+    let likesCount = 12;
+
+    function setProto(proto) {
+      currentProto = proto;
+      document.getElementById('btnHttp').classList.toggle('active', proto === 'HTTP');
+      document.getElementById('btnHttps').classList.toggle('active', proto === 'HTTPS');
+    }
+
+    function updateEndpointDisplay() {
+      const method = document.getElementById('methodSelect').value;
+      const badge = document.getElementById('activeEndpointBadge');
+      if (method === 'GET') {
+        badge.innerText = 'Route: /api/products';
+      } else {
+        badge.innerText = 'Route: /api/login';
+      }
+    }
+
+    function startSimulation() {
+      if (animationTimer) clearTimeout(animationTimer);
+
+      const method = document.getElementById('methodSelect').value;
+      const statusCode = document.getElementById('statusSelect').value;
+      const packet = document.getElementById('packet');
+
+      const clientNode = document.getElementById('nodeClient');
+      const apiNode = document.getElementById('nodeApi');
+      const serverNode = document.getElementById('nodeServer');
+
+      const clientX = clientNode.offsetLeft + (clientNode.offsetWidth / 2);
+      const apiX = apiNode.offsetLeft + (apiNode.offsetWidth / 2);
+      const serverX = serverNode.offsetLeft + (serverNode.offsetWidth / 2);
+
+      if (currentProto === 'HTTP' && method === 'POST') {
+        alert('⚠️ تنبيه للشرح: إرسال بيانات (POST) عبر HTTP غير المشفر يتيح للمتجسسين رؤية البيانات! الأفضل استخدام HTTPS.');
+      }
+
+      // 1. إعداد الطرد عند البداية من العميل
+      packet.style.transition = 'none';
+      packet.style.left = clientX + 'px';
+      packet.style.opacity = '1';
+      packet.innerText = `${currentProto} ${method}`;
+      
+      const primaryBg = method === 'GET' ? 'var(--primary)' : 'var(--accent)';
+      const primaryGlow = method === 'GET' ? 'var(--primary-glow)' : 'var(--accent-glow)';
+      
+      packet.style.background = primaryBg;
+      packet.style.boxShadow = `0 0 20px ${primaryGlow}`;
+
+      packet.offsetHeight;
+
+      // 2. انطلاق الطلب من العميل 💻 إلى الـ API 🔌
+      packet.style.transition = 'left 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+      packet.style.left = apiX + 'px';
+
+      // 3. التوجه من الـ API 🔌 إلى الخادم 🖥️
+      animationTimer = setTimeout(() => {
+        packet.style.left = serverX + 'px';
+
+        // 4. وصول الخادم وتجهيز الاستجابة للعودة إلى العميل
+        animationTimer = setTimeout(() => {
+          let statusBg = 'var(--success)';
+          let statusGlow = 'var(--success-glow)';
+
+          if (statusCode === '404') {
+            statusBg = 'var(--warning)';
+            statusGlow = 'rgba(245, 158, 11, 0.5)';
+          }
+          if (statusCode === '500') {
+            statusBg = 'var(--danger)';
+            statusGlow = 'rgba(239, 68, 68, 0.5)';
+          }
+
+          packet.innerText = `Status: ${statusCode}`;
+          packet.style.background = statusBg;
+          packet.style.boxShadow = `0 0 20px ${statusGlow}`;
+
+          // رحلة عودة الاستجابة من الخادم 🖥️ ➔ العميل 💻
+          packet.style.left = clientX + 'px';
+
+          animationTimer = setTimeout(() => {
+            packet.style.opacity = '0';
+            updateJsonResponse();
+          }, 800);
+
+        }, 700);
+
+      }, 700);
+    }
+
+    function updateJsonResponse() {
+      const statusCode = document.getElementById('statusSelect').value;
+      const jsonDisplay = document.getElementById('jsonDisplay');
+      const statusText = document.getElementById('statusText');
+
+      if (statusCode === '200') {
+        statusText.innerHTML = 'حالة الاستجابة: <span style="color:var(--success); font-weight:bold;">200 OK (تمت بنجاح)</span>';
+        jsonDisplay.innerText = JSON.stringify({
+          status: 200,
+          message: "تم جلب البيانات بنجاح",
+          data: { user: "طالب", lesson: "3-2" }
+        }, null, 2);
+      } else if (statusCode === '404') {
+        statusText.innerHTML = 'حالة الاستجابة: <span style="color:var(--warning); font-weight:bold;">404 Not Found (غير موجود)</span>';
+        jsonDisplay.innerText = JSON.stringify({
+          status: 404,
+          error: "المورد المطلوب غير موجود بهذا العنوان"
+        }, null, 2);
+      } else {
+        statusText.innerHTML = 'حالة الاستجابة: <span style="color:var(--danger); font-weight:bold;">500 Server Error (خطأ خادم)</span>';
+        jsonDisplay.innerText = JSON.stringify({
+          status: 500,
+          error: "حدث خطأ داخلي في الخادم أثناء المعالجة"
+        }, null, 2);
+      }
+    }
+
+    function resetLikeState() {
+      const userName = document.getElementById('userSelect').value;
+      document.getElementById('activeStudentName').innerText = userName;
+      
+      const payload = {
+        userId: userName === 'عمر' ? 'user_omar' : 'user_abdullah',
+        userName: userName,
+        postId: 101,
+        action: isLiked ? "UNLIKE" : "LIKE"
+      };
+
+      document.getElementById('requestPayload').innerText = JSON.stringify(payload, null, 2);
+    }
+
+    function sendLikeRequest() {
+      const userName = document.getElementById('userSelect').value;
+      const likeBtn = document.getElementById('likeBtn');
+      const heartIcon = document.getElementById('heartIcon');
+      const likeText = document.getElementById('likeText');
+      const likesCountElem = document.getElementById('likesCount');
+
+      isLiked = !isLiked;
+      likesCount += isLiked ? 1 : -1;
+
+      if (isLiked) {
+        likeBtn.classList.add('liked');
+        heartIcon.innerText = '❤️';
+        likeText.innerText = 'تم الإعجاب';
+      } else {
+        likeBtn.classList.remove('liked');
+        heartIcon.innerText = '🤍';
+        likeText.innerText = 'إعجاب (Like)';
+      }
+      likesCountElem.innerText = likesCount;
+
+      const requestData = {
+        userId: userName === 'عمر' ? 'user_omar' : 'user_abdullah',
+        userName: userName,
+        postId: 101,
+        action: isLiked ? "LIKE" : "UNLIKE"
+      };
+      document.getElementById('requestPayload').innerText = JSON.stringify(requestData, null, 2);
+
+      const responseData = {
+        status: "success",
+        message: isLiked ? `تم تسجيل إعجاب ${userName} بنجاح` : `تم إلغاء إعجاب ${userName}`,
+        updatedLikes: likesCount
+      };
+      document.getElementById('likeResponsePayload').innerText = JSON.stringify(responseData, null, 2);
+
+      document.getElementById('methodSelect').value = 'POST';
+      document.getElementById('activeEndpointBadge').innerText = 'Route: /api/posts/101/like';
+      startSimulation();
+    }
+  </script>
+
+</body>
+</html>
